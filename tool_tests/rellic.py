@@ -146,11 +146,13 @@ class RellicCmd:
 
         dumpout = pth.joinpath("stdout")
         with open(dumpout, "w") as out:
-            out.write(self.out)
+            if self.out is not None:
+                out.write(self.out)
 
         dumperr = pth.joinpath("stderr")
         with open(dumperr, "w") as err:
-            err.write(self.err)
+            if self.err is not None:
+                err.write(self.err)
 
         repro = pth.joinpath("repro.sh")
         with open(repro, 'w') as reprofile:
