@@ -188,7 +188,7 @@ class RellicCmd:
             return cpe.returncode
         except subprocess.TimeoutExpired as tme:
             log.debug("Rellic hit a timeout")
-            self.set_output(-131, "", tme.strerror)
+            self.set_output(-131, tme.stdout, tme.stderr)
             return -131
 
         if 0 == os.path.getsize(self.tmpout):
