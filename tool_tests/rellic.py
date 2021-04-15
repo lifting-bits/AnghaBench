@@ -5,7 +5,7 @@ import shutil
 import logging
 import subprocess
 import signal
-from os import path
+from os import path, strerror
 import os
 from pathlib import Path
 from tqdm import tqdm
@@ -93,6 +93,7 @@ class RellicCmd:
 
     def get_output_path(self):
         rc_to_path = {
+            -131: "timeout",
             -130: "oserror",
             -129: "zero-sized-output",
             -signal.SIGBUS: "sigbus",
@@ -105,6 +106,18 @@ class RellicCmd:
         if self.rc != -signal.SIGABRT:
             return rc_to_path.get(self.rc, "unknown")
         else:
+            # First, check for a fatal error in the style of:
+            # F0415 05:22:54.866288 437680 IRToASTVisitor.cpp:123] Unknown LLVM Type
+            # Check only lines starting with 'F' since those are the fatal errors
+            for ln in self.err.splitlines():
+                if ln.startswith("F"):
+                    fname = FILE_NAME_RE.search(ln)
+                    if fname:
+                        return fname.group(0)
+
+            # Next, check for more generic filename matches in the whole message
+            # example:
+            # UNREACHABLE executed at /__w/cxx-common/cxx-common/vcpkg/buildtrees/llvm-11/src/org-11.0.0-8ebd641fb6.clean/llvm/lib/Support/APFloat.cpp:154!
             fname = FILE_NAME_RE.search(self.err)
             if fname:
                 return fname.group(0)
@@ -163,6 +176,7 @@ class RellicCmd:
                 check=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
+                timeout=120, # two minutes should be more than enough
             )
         except OSError as oe:
             log.debug("Rellic invocation hit OS error")
@@ -172,6 +186,10 @@ class RellicCmd:
             log.debug("Rellic invocation errored")
             self.set_output(cpe.returncode, cpe.stdout, cpe.stderr)
             return cpe.returncode
+        except subprocess.TimeoutExpired as tme:
+            log.debug("Rellic hit a timeout")
+            self.set_output(-131, "", tme.strerror)
+            return -131
 
         if 0 == os.path.getsize(self.tmpout):
             self.set_output(
