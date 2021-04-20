@@ -50,7 +50,8 @@ def emit_clang_bc_cmdline(of, clang, arch, dstfile, srcfile):
 
 
 def emit_clang_elf_cmdline(of, clang, arch, dstfile, srcfile):
-    emit_clang_cmdline(of, clang, [], arch, dstfile, srcfile, suffix=".elf")
+    # emit a "-c" since these source files do not have a `main`
+    emit_clang_cmdline(of, clang, ["-c"], arch, dstfile, srcfile, suffix=".elf")
 
 
 def emit_mkdir_command(
