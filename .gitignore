@@ -1,3 +1,6 @@
 *.xz
 bitcode/
+binaries/
 .vscode/
+compile_commands.txt
+compiled/
