@@ -14,10 +14,13 @@ ARCHES=(
 
 pushd ${DIR}/.. &>/dev/null
 
-for arch in "${ARCHES[@]}"
+for otype in bitcode binaries
 do
-  bcfile=bitcode.${CLANG}.${arch}.tar.xz
-  curl -LO https://anghabench-files-public.nyc3.digitaloceanspaces.com/${CLANG}/${bcfile}
+  for arch in "${ARCHES[@]}"
+  do
+    bcfile=${otype}.${CLANG}.${arch}.tar.xz
+    curl -LO https://anghabench-files-public.nyc3.digitaloceanspaces.com/${CLANG}/${bcfile}
+  done
 done
 
 popd &>/dev/null

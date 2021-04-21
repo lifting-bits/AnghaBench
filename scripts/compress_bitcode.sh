@@ -5,13 +5,16 @@ set -euo pipefail
 
 CLANG=clang-11
 
-pushd ${DIR}/.. &>/dev/null
+pushd ${DIR}/../compiled &>/dev/null
 
-for archdir in bitcode/*
+for otype in bitcode binaries
 do
-  arch=$(basename ${archdir})
-  echo "Compressing ${arch}"
-  XZ_OPT=-e9 tar -Ipixz -cf bitcode.${CLANG}.${arch}.tar.xz bitcode/${arch}
+  for archdir in ${otype}/*
+  do
+    arch=$(basename ${archdir})
+    echo "Compressing ${otype} ${arch}"
+    XZ_OPT=-e9 tar -Ipixz -cf ${otype}.${CLANG}.${arch}.tar.xz ${otype}/${arch}
+  done
 done
 
 popd &>/dev/null
