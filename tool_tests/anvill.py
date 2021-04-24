@@ -3,6 +3,7 @@ import argparse
 import sys
 import shutil
 import logging
+import subprocess
 from os import path
 import os
 from pathlib import Path
@@ -11,68 +12,37 @@ from multiprocessing import Pool
 from functools import partial
 from toolcmd import ToolCmd
 
-log = logging.getLogger("rellic_test_suite")
+log = logging.getLogger("anvill_test_suite")
 log.addHandler(logging.StreamHandler())
 #log.setLevel(logging.DEBUG)
 log.setLevel(logging.INFO)
 
 
 MYDIR = path.dirname(path.abspath(__file__))
-# given some input bitocode, run it through rellic and record outputs
 
+# given some input bitocode, run it through anvill record outputs
 
-# Output dir will have:
-# output_dir/
-#  success/
-#    testnumber.arch.original_input_file/
-#      bitcode.bc
-#      output.c
-#      stdout
-#      stderr
-#  segv/
-#   testnumber.arch.original_input_file/
-#      bitcode.bc
-#      stdout
-#      stderr
-#      repro.sh
-#  abort/
-#   testnumber.arch.original_input_file/
-#      bitcode.bc
-#      stdout
-#      stderr
-#      repro.sh
-#  other/
-#   testnumber.arch.original_input_file/
-#      bitcode.bc
-#      stdout
-#      stderr
-#      repro.sh
-#
-
-
-class RellicCmd(ToolCmd):
+class AnvillCmd(ToolCmd):
 
     def make_tool_cmd(self):
         f = self.infile.stem
-        cfile = f"{self.index}-{f}.c"
-        self.tmpout = self.outdir.joinpath("work").joinpath(cfile)
+        jsonfile = f"{self.index}-{f}.json"
+        self.tmpout = self.outdir.joinpath("work").joinpath(jsonfile)
 
-        # rellic -logtostderr -input /input/dir/foo.bc -output /output/dir/work/foo.c
+        #python3 -m anvill --bin_in foo.elf --spec_out foo.json 
         log.debug(f"Setting tmpout to: {self.tmpout}")
-        args = [
-            self.tool,
-            "--lower_switch",
-            "--remove_phi_nodes",
-            "-logtostderr",
-            "-input",
+        args = self.tool.split()
+        args.extend([
+            "--bin_in",
             str(self.infile),
-            "-output",
+            "--spec_out",
             str(self.tmpout),
-        ]
+            "--log_file",
+            "/dev/stderr",
+        ])
         return args
 
     def save(self):
-
         if self.rc is None:
             raise RuntimeError("Return code never set")
 
@@ -82,11 +52,11 @@ class RellicCmd(ToolCmd):
         log.debug(f"Making dir: {pth}")
         os.makedirs(pth, exist_ok=True)
 
-        input_name = pth.joinpath("input.bc")
+        input_name = pth.joinpath("input.elf")
         shutil.copyfile(self.infile, input_name)
 
         if self.rc == 0:
-            output_name = pth.joinpath("output.c")
+            output_name = pth.joinpath("output.json")
             log.debug(f"Copying {self.tmpout} to {output_name}")
             shutil.copyfile(self.tmpout, output_name)
 
@@ -110,28 +80,27 @@ class RellicCmd(ToolCmd):
             reprofile.write(" ".join(self.cmd))
             reprofile.write("\n")
 
-
-def run_rellic(rellic, output_dir, failonly, source_path, input_and_idx):
+def run_anvill(anvill, output_dir, failonly, source_path, input_and_idx):
     idx, input_file = input_and_idx
-    cmd = RellicCmd(rellic, input_file, output_dir, source_path, idx)
+    cmd = AnvillCmd(anvill, input_file, output_dir, source_path, idx)
 
     retcode = cmd.run()
-    log.debug(f"Rellic run returned {retcode}")
+    log.debug(f"Anvill run returned {retcode}")
 
     if not failonly:
         cmd.save()
     elif failonly and retcode != 0:
-        log.debug("Saving rellic failure case")
+        log.debug("Saving anvill failure case")
         cmd.save()
     else:
-        log.debug("Successful rellic invocation not saved due to --only-fails=True")
+        log.debug("Successful anvill invocation not saved due to --only-fails=True")
 
     return cmd
 
 
 if __name__ == "__main__":
 
-    # rellic.py
+    # anvill.py
     #   --input-dir input_dir
     #   --output-dir output_dir
     #   --only-fails
@@ -139,16 +108,16 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--rellic", default="rellic-decomp-11.0", help="Which rellic to run"
+        "--anvill", default="python3 -m anvill", help="Which anvill to run"
     )
     parser.add_argument(
         "--input-dir",
-        default=f"{MYDIR}/../bitcode",
-        help="where to look for source files",
+        default=f"{MYDIR}/../compiled/binaries",
+        help="where to look for binary inputs"
     )
     parser.add_argument(
         "--output-dir",
-        default=f"{MYDIR}/../results/rellic",
+        default=f"{MYDIR}/../results/anvill",
         help="where to put results",
     )
     parser.add_argument(
@@ -166,16 +135,19 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if shutil.which(args.rellic) is None:
-        sys.stderr.write(f"Could not find rellic command: {args.rellic}\n")
+    test_anvill_args = args.anvill.split()
+    test_anvill_args.append("-h")
+    anvill_test = subprocess.run(test_anvill_args, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+    if anvill_test.returncode != 0:
+        sys.stderr.write(f"Could not find anvill command: {args.anvill}\n")
         sys.exit(1)
 
     source_path = Path(args.input_dir)
     dest_path = Path(args.output_dir)
     # get all the bitcode
     log.info(f"Listing files in {str(source_path)}")
-    sources = list(source_path.rglob("*.bc"))
-    log.info(f"Found {len(sources)} bitcode files")
+    sources = list(source_path.rglob("*.elf"))
+    log.info(f"Found {len(sources)} ELF files")
 
     if sources:
         workdir = str(dest_path.joinpath("work"))
@@ -185,9 +157,9 @@ if __name__ == "__main__":
     
     num_cpus = os.cpu_count()
     max_items = len(sources)
-    apply_rellic = partial(run_rellic, args.rellic, dest_path, args.only_fails, source_path)
+    apply_anvill = partial(run_anvill, args.anvill, dest_path, args.only_fails, source_path)
 
     with Pool(processes=num_cpus) as p:
         with tqdm(total=max_items) as pbar:
-            for _ in p.imap_unordered(apply_rellic, enumerate(sources)):
+            for _ in p.imap_unordered(apply_anvill, enumerate(sources)):
                 pbar.update()
