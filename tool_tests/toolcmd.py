@@ -12,7 +12,7 @@ FILE_NAME_RE = re.compile("([^/\s]+\.[^/\s]+:\d+)")
 PYTHON_ERROR_RE = re.compile('([^/\s]+\.py)", line (\d+)')
 
 class ToolCmd:
-    def __init__(self, tool, infile, outdir, source_base, index):
+    def __init__(self, tool, infile, outdir, source_base, index, stats):
         self.source_base = source_base
         self.index = index
         self.infile = infile
@@ -23,6 +23,7 @@ class ToolCmd:
         self.rc = None
         self.out = None
         self.err = None
+        self.stats = stats
 
     def set_output(self, rc, out, err):
         self.rc = rc
@@ -102,6 +103,7 @@ class ToolCmd:
 
         try:
             log.debug(f"Running [{self.cmd}]")
+            self.stats.inc_stat("program_runs")
             tool_run = subprocess.run(
                 args=self.cmd,
                 universal_newlines=True,
@@ -119,6 +121,7 @@ class ToolCmd:
             self.set_output(cpe.returncode, cpe.stdout, cpe.stderr)
             return cpe.returncode
         except subprocess.TimeoutExpired as tme:
+            self.stats.inc_stat("program_timeouts")
             log.debug("Tool hit a timeout")
             self.set_output(-131, tme.stdout, tme.stderr)
             return -131

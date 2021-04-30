@@ -8,8 +8,10 @@ import os
 from pathlib import Path
 from tqdm import tqdm
 from multiprocessing import Pool
+from multiprocessing.pool import ThreadPool
 from functools import partial
 from toolcmd import ToolCmd
+from stats import Stats
 
 log = logging.getLogger("rellic_test_suite")
 log.addHandler(logging.StreamHandler())
@@ -76,8 +78,11 @@ class RellicCmd(ToolCmd):
         if self.rc is None:
             raise RuntimeError("Return code never set")
 
-        pth = self.outdir.joinpath(self.get_output_path())
+        out_path_name = self.get_output_path()
+        pth = self.outdir.joinpath(out_path_name)
         pth = pth.joinpath(self.infile.relative_to(self.source_base))
+
+        self.stats.add_stat(out_path_name, str(self.infile))
 
         log.debug(f"Making dir: {pth}")
         os.makedirs(pth, exist_ok=True)
@@ -111,9 +116,9 @@ class RellicCmd(ToolCmd):
             reprofile.write("\n")
 
 
-def run_rellic(rellic, output_dir, failonly, source_path, input_and_idx):
+def run_rellic(rellic, output_dir, failonly, source_path, stats, input_and_idx):
     idx, input_file = input_and_idx
-    cmd = RellicCmd(rellic, input_file, output_dir, source_path, idx)
+    cmd = RellicCmd(rellic, input_file, output_dir, source_path, idx, stats)
 
     retcode = cmd.run()
     log.debug(f"Rellic run returned {retcode}")
@@ -185,9 +190,17 @@ if __name__ == "__main__":
     
     num_cpus = os.cpu_count()
     max_items = len(sources)
-    apply_rellic = partial(run_rellic, args.rellic, dest_path, args.only_fails, source_path)
+    rellic_stats = Stats()
+    rellic_stats.inc_stat("foo")
+    apply_rellic = partial(run_rellic, args.rellic, dest_path, args.only_fails, source_path, rellic_stats)
 
-    with Pool(processes=num_cpus) as p:
+    #with Pool(processes=num_cpus) as p:
+    with ThreadPool(num_cpus) as p:
         with tqdm(total=max_items) as pbar:
             for _ in p.imap_unordered(apply_rellic, enumerate(sources)):
                 pbar.update()
+
+    if args.slack_notify:
+        rellic_stats.print_stats()
+
+    
