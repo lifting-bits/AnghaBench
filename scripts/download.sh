@@ -8,6 +8,7 @@ CLANG=clang-11
 ARCHES=(
   amd64
   arm64
+  armv7
   x86
 )
 
