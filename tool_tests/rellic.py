@@ -12,6 +12,9 @@ from multiprocessing.pool import ThreadPool
 from functools import partial
 from toolcmd import ToolCmd
 from stats import Stats
+from slack import Slack
+from datetime import datetime
+from io import StringIO
 
 log = logging.getLogger("rellic_test_suite")
 log.addHandler(logging.StreamHandler())
@@ -82,7 +85,7 @@ class RellicCmd(ToolCmd):
         pth = self.outdir.joinpath(out_path_name)
         pth = pth.joinpath(self.infile.relative_to(self.source_base))
 
-        self.stats.add_stat(out_path_name, str(self.infile))
+        self.stats.add_stat(f"output.{out_path_name}", str(self.infile))
 
         log.debug(f"Making dir: {pth}")
         os.makedirs(pth, exist_ok=True)
@@ -166,7 +169,7 @@ if __name__ == "__main__":
         "--slack-notify",
         default=False,
         action="store_true",
-        help="Notify slack about stats",
+        help="Notify slack. SLACK_HOOK env var for the webhook",
     )
 
     args = parser.parse_args()
@@ -191,7 +194,7 @@ if __name__ == "__main__":
     num_cpus = os.cpu_count()
     max_items = len(sources)
     rellic_stats = Stats()
-    rellic_stats.inc_stat("foo")
+    rellic_stats.set_stat("start_time", str(datetime.now()))
     apply_rellic = partial(run_rellic, args.rellic, dest_path, args.only_fails, source_path, rellic_stats)
 
     #with Pool(processes=num_cpus) as p:
@@ -200,7 +203,29 @@ if __name__ == "__main__":
             for _ in p.imap_unordered(apply_rellic, enumerate(sources)):
                 pbar.update()
 
-    if args.slack_notify:
-        rellic_stats.print_stats()
+    rellic_stats.set_stat("end_time", str(datetime.now()))
 
-    
+    if args.slack_notify:
+        msg_hook = os.environ.get("SLACK_HOOK", None)
+
+        if not msg_hook:
+            sys.stderr.write("Invalid webhook in SLACK_HOOK env var")
+
+        slack_msg = Slack(msg_hook)
+        slack_msg.add_header(f"Rellic AnghaBench Run Statistics")
+        slack_msg.add_block(f"Input directory: `{args.input_dir}`")
+        slack_msg.add_divider()
+
+        with StringIO() as stat_msg:
+            rellic_stats.print_stats(stat_msg)
+            slack_msg.add_block(stat_msg.getvalue())
+
+        slack_msg.add_divider()
+
+        with StringIO() as fail_msg:
+            max_num_fails = 10
+            slack_msg.add_block(f"Top {max_num_fails}:")
+            rellic_stats.print_fails(fail_count=max_num_fails, output=fail_msg)
+            slack_msg.add_block(fail_msg.getvalue())
+        
+        slack_msg.post()

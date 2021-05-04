@@ -43,7 +43,6 @@ class Slack:
         msg_d = {
             'blocks': self.blocks
         }
-        sys.stdout.write(f"Would dump:\n\n{json.dumps(msg_d)}")
         resp = requests.post(
             self.hook, data = json.dumps(msg_d),
             headers = {'Content-Type': 'application/json'})

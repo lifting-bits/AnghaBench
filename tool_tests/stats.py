@@ -18,14 +18,19 @@ class Stats:
         if output is None:
             output = sys.stderr
 
-        # filter output by
+        # Do a dictionary comprehension to filter for keys that
+        # start with "output.", but ignore the success case, since
+        # we only want the failures here
         out_stats = {
             k: v
             for k, v in self.stats.items()
             if k.startswith("output.") and k != "output.success"
         }
+
+        # Sort dictionary by length of key
         top_items = sorted(out_stats.items(), reverse=True, key=lambda x: len(x[1]))
 
+        # Output the top fail_count items
         for k, v in top_items[:fail_count]:
             k = k.replace("output.", "")
             output.write(f"`{k}`: `{len(v)}` failures\n")
