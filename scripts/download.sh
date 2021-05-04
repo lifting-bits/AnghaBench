@@ -11,6 +11,8 @@ ARCHES=(
   x86
 )
 
+# supported sizes are currently "1k." and empty ("") 
+RUNSIZE=${1:-""}
 
 pushd ${DIR}/.. &>/dev/null
 
@@ -19,7 +21,7 @@ do
   for arch in "${ARCHES[@]}"
   do
     bcfile=${otype}.${CLANG}.${arch}.tar.xz
-    curl -LO https://anghabench-files-public.nyc3.digitaloceanspaces.com/${CLANG}/${bcfile}
+    curl -LO https://anghabench-files-public.nyc3.digitaloceanspaces.com/${CLANG}/${RUNSIZE}${bcfile}
   done
 done
 
