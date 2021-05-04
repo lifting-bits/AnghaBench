@@ -24,13 +24,15 @@ def replace_vars(vars, script):
 
 def make_do_droplet(token, droplet_info):
     url = "https://api.digitalocean.com/v2/droplets" 
-    #resp = requests.post(
-    #    url, data = json.dumps(droplet_info),
-    #    headers = {'Content-Type': 'application/json',
-    #        'Authorization': f'Bearer {token}'})
+    resp = requests.post(
+        url, data = json.dumps(droplet_info),
+        headers = {'Content-Type': 'application/json',
+            'Authorization': f'Bearer {token}'})
 
-    #if resp.status_code < 200 or resp.status_code >= 300:
-    #    raise RuntimeError(f"Could not make DO Droplet: {str(resp)}: {resp.content}")
+    if resp.status_code < 200 or resp.status_code >= 300:
+        raise RuntimeError(f"Could not make DO Droplet: {str(resp)}: {resp.content}")
+    else:
+        sys.stdout.write("Successfully created new droplet!\n")
 
 if __name__ == "__main__":
 
