@@ -15,6 +15,7 @@ from stats import Stats
 from slack import Slack
 from datetime import datetime
 from io import StringIO
+import subprocess
 
 log = logging.getLogger("rellic_test_suite")
 log.addHandler(logging.StreamHandler())
@@ -137,6 +138,21 @@ def run_rellic(rellic, output_dir, failonly, source_path, stats, input_and_idx):
     return cmd
 
 
+def get_rellic_version(cmd):
+    try:
+        rt =  subprocess.run([cmd, "--version"], timeout=30, capture_output=True)
+    except OSError as oe:
+        log.error(f"Could not get rellic version: {oe}")
+        sys.exit(1)
+    except subprocess.CalledProcessError as cpe:
+        log.error(f"Could not get rellic version: {cpe}")
+        sys.exit(1)
+    except subprocess.TimeoutExpired as tme:
+        log.error(f"Could not get rellic version: timeout execption")
+        sys.exit(1)
+
+    return rt.stdout.decode("utf-8")
+
 if __name__ == "__main__":
 
     # rellic.py
@@ -178,6 +194,9 @@ if __name__ == "__main__":
         sys.stderr.write(f"Could not find rellic command: {args.rellic}\n")
         sys.exit(1)
 
+    version = get_rellic_version(args.rellic)
+    log.info(f"Running against Rellic:\n{version}")
+
     source_path = Path(args.input_dir)
     dest_path = Path(args.output_dir)
     # get all the bitcode
@@ -213,7 +232,7 @@ if __name__ == "__main__":
 
         slack_msg = Slack(msg_hook)
         slack_msg.add_header(f"Rellic AnghaBench Run Statistics")
-        slack_msg.add_block(f"Input directory: `{args.input_dir}`")
+        slack_msg.add_block(f"Rellic Version: ```{version}```")
         slack_msg.add_divider()
 
         with StringIO() as stat_msg:

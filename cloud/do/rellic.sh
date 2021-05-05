@@ -18,10 +18,13 @@ export SLACK_HOOK=__SLACK_HOOK__
 export ANGHA_BRANCH=__ANGHA_BRANCH__
 export RELLIC_BRANCH=__RELLIC_BRANCH__
 export RUN_SIZE=__RUN_SIZE__
+
 export LLVM_VERSION=11
+export CC=clang-11 CXX=clang++-11
+export DEBIAN_FRONTEND=noninteractive
 
 apt-get update
-apt-get install -yqq rpm curl git python3 python3-pip xz-utils cmake ninja-build build-essential clang-11
+apt-get install -yqq curl git python3 python3-pip xz-utils cmake ninja-build clang-11
 python3 -m pip install requests
 
 git clone --depth=1 -b ${RELLIC_BRANCH}  https://github.com/lifting-bits/rellic rellic
@@ -29,8 +32,9 @@ git clone --depth=1 -b ${ANGHA_BRANCH}   https://github.com/lifting-bits/AnghaBe
 
 pushd rellic
 # build us a rellic
-scripts/build.sh --llvm-version ${LLVM_VERSION}
-dpkg -i rellic-build/*.deb
+scripts/build-and-install.sh \
+    --llvm-version ${LLVM_VERSION} \
+    --extra-cmake-args "-DCMAKE_BUILD_TYPE=Release"
 popd
 
 pushd angha
