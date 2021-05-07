@@ -39,15 +39,18 @@ Compilation takes about 30 minutes per architecture on a Ryzen 9 5950x.
 
 ## Downloading Pre-Built Bitcode
 
-The download script will pull pre-made bitcode for all available architectures. Each architecture is around 1 GiB in size, compressed.
+The download script will pull pre-made bitcode for all available architectures. 
+There are two sets, a trimmed down version (`1k`, only 1000 files) and the full set (`1m`, one million files).
+The `1m` set for each architecture is around 1 GiB in size, compressed.
 
 ```sh
-scripts/download.sh
+# download the 1000 set of bitcode and binaries for each architecture
+lifting-tools-ci/datasets/fetch_anghabench.sh --run_size 1k --bitcode --binaries
 ```
 
 ## Tool Usage
 
-The `generate_compile_commands.py` script takes several options to make a file of compilation commands that should be passed to `parallel`.
+The `generate_compile_commands.py` script takes several options to make a file of compilation commands that should be passed to `xargs`.
 
 ```
 $ scripts/generate_compile_commands.py --help
@@ -61,7 +64,5 @@ optional arguments:
   -o OUTFILE, --outfile OUTFILE
                         Output file to write, default to stdout
 ```
-
-The `download.sh` script will download pre-made bitcode archives.o
 
 The `compress.sh` script compresses compiled bitcode for archiving.
